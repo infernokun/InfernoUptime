@@ -57,6 +57,5 @@ deploy:
     - docker
   dependencies:
     - build-rest
-    - build-python
     - build-web
   when: manual
