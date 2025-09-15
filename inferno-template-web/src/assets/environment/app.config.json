@@ -1,0 +1,7 @@
+{
+  "production": false,
+  "baseUrl": "http://localhost:4200",
+  "restUrl": "http://localhost:8080/inferno-template-rest/api",
+  "baseEndPoint": "inferno-template",
+  "websocketUrl": "ws://localhost:8080/inferno-template-rest"
+}

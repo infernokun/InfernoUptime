@@ -1,0 +1,8 @@
+{
+  "name": "inferno-template",
+  "version": "0.0.0",
+  "scripts": {
+    "start:web": "cd inferno-template-web && npm run start",
+    "push:git": "git push gitlab main && git push github main"
+  }
+}

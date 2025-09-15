@@ -1,0 +1,50 @@
+services:
+  postgres:
+    container_name: inferno_template_psql
+    image: postgres:17.4
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inferno-template}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inferno-template}
+      POSTGRES_DB: ${POSTGRES_DB:-inferno-template}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - inferno-template-network
+
+  pgadmin:
+    container_name: inferno_template_pgadmin
+    image: dpage/pgadmin4:latest
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${POSTGRES_USER:-inferno-template}@${POSTGRES_USER:-inferno-template}.com
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-inferno-template}
+    ports:
+      - "5050:80"
+    networks:
+      - inferno-template-network
+
+  redis:
+    container_name: inferno_template_redis
+    image: redis:latest
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - inferno-template-network
+    environment:
+      - REDIS_PASSWORD=inferno-template
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres-data:
+    driver: local
+  redis_data:
+    driver: local
+networks:
+  inferno-template-network:
+    driver: bridge
