@@ -1,0 +1,187 @@
+# Production Profile
+management:
+  endpoints:
+    web:
+      cors:
+        allowed-methods: GET,POST,PUT,DELETE
+        allowed-origins: ${ALLOWED_ORIGINS:http://localhost:4200}
+        allowed-headers: "Authorization,Content-Type,X-Requested-With,Accept"
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  info:
+    env:
+      enabled: false # Don't expose environment details in production
+    java:
+      enabled: false
+    os:
+      enabled: false
+  security:
+    enabled: true
+
+spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 100MB
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:inferno_uptime_prod}
+    username: ${DB_USER}
+    password: ${DB_PASS}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_MIN_IDLE:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Never auto-update schema in production
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 3000ms
+      database: ${REDIS_DB:0}
+      connect-timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX:20}
+          max-idle: ${REDIS_POOL_MAX_IDLE:10}
+          min-idle: ${REDIS_POOL_MIN_IDLE:5}
+          max-wait: 3000ms
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000 # 1 hour
+
+  jackson:
+    default-property-inclusion: NON_NULL
+    serialization:
+      write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: ${CONTEXT_PATH:/inferno-uptime-rest}
+  shutdown: graceful
+  forward-headers-strategy: native
+  use-forward-headers: true
+  tomcat:
+    max-swallow-size: 100MB
+    max-http-post-size: 100MB
+    threads:
+      max: ${TOMCAT_MAX_THREADS:400}
+      min-spare: ${TOMCAT_MIN_THREADS:50}
+    connection-timeout: 20000
+    max-connections: ${TOMCAT_MAX_CONNECTIONS:8192}
+    accept-count: 100
+    internal-proxies:
+      protocol-header: "X-Forwarded-Proto"
+      remote-ip-header: "X-Forwarded-For"
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+logging:
+  level:
+    com.infernokun: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: false
+    org.hibernate.orm.connections.pooling: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_FILE:/var/log/inferno-uptime/application.log}
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 3GB
+
+# Production-specific Inferno settings
+inferno:
+  uptime:
+    concurrent-checks: ${UPTIME_CONCURRENT_CHECKS:100}
+    default-check-interval: 30s
+    cleanup:
+      enabled: true
+      retention-days: ${UPTIME_RETENTION_DAYS:365} # Keep 1 year of data
+    notifications:
+      enabled: true
+      email:
+        enabled: ${EMAIL_NOTIFICATIONS_ENABLED:true}
+      webhook:
+        enabled: true
+    performance:
+      batch-size: ${UPTIME_BATCH_SIZE:100}
+      thread-pool-size: ${UPTIME_THREAD_POOL:20}
+
+# Security - Must be properly configured for production
+security:
+  default-admin-username: ${ADMIN_USERNAME:admin}
+  default-admin-password: ${ADMIN_PASSWORD} # Must be set via environment
+  encryption-key: ${ENCRYPTION_KEY} # Must be set via environment (32+ chars)
+  jwt:
+    expiration: ${JWT_EXPIRATION:43200} # 12 hours in production
+
+# RSA Keys for JWT (recommended for production)
+rsa:
+  enabled: ${RSA_KEYS_ENABLED:true}
+
+# Health Check Configuration
+health:
+  diskspace:
+    threshold: 1GB
+  redis:
+    enabled: true
+  db:
+    enabled: true

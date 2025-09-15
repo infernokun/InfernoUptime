@@ -1,8 +1,11 @@
 {
-  "name": "inferno-template",
+  "name": "inferno-uptime",
   "version": "0.0.0",
   "scripts": {
-    "start:web": "cd inferno-template-web && npm run start",
+    "start:web": "cd inferno-uptime-web && npm run start",
     "push:git": "git push gitlab main && git push github main"
+  },
+  "devDependencies": {
+    "@types/sockjs-client": "^1.5.4"
   }
 }

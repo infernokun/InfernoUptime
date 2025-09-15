@@ -1,0 +1,370 @@
+.monitors-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.monitors-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+
+    .header-content {
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #666;
+            margin: 4px 0 0 0;
+            font-size: 1rem;
+        }
+    }
+
+    button {
+        height: 48px;
+        font-weight: 600;
+        border-radius: 12px;
+    }
+}
+
+.filters-card {
+    margin-bottom: 24px;
+    border-radius: 12px;
+
+    .filters-row {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+
+        .search-field {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        mat-form-field {
+            margin-bottom: 0;
+        }
+    }
+}
+
+.table-card {
+    border-radius: 12px;
+    overflow: hidden;
+
+    .table-container {
+        overflow-x: auto;
+        max-height: 70vh;
+    }
+}
+
+.monitors-table {
+    width: 100%;
+
+    .mat-column-status {
+        width: 80px;
+        text-align: center;
+    }
+
+    .mat-column-name {
+        min-width: 200px;
+    }
+
+    .mat-column-url {
+        min-width: 250px;
+    }
+
+    .mat-column-responseTime {
+        width: 120px;
+        text-align: center;
+    }
+
+    .mat-column-uptime {
+        width: 100px;
+        text-align: center;
+    }
+
+    .mat-column-lastCheck {
+        width: 140px;
+    }
+
+    .mat-column-active {
+        width: 80px;
+        text-align: center;
+    }
+
+    .mat-column-actions {
+        width: 60px;
+        text-align: center;
+    }
+}
+
+// Table cell styles
+.status-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    mat-icon {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+    }
+}
+
+.name-cell {
+    .monitor-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+    }
+
+    .monitor-type {
+        font-size: 0.75rem;
+        color: #666;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+}
+
+.url-cell {
+    .monitor-url {
+        color: #1976d2;
+        text-decoration: none;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        max-width: 250px;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+.response-time-cell {
+    font-weight: 600;
+    font-size: 0.875rem;
+
+    &.fast {
+        color: #4caf50;
+    }
+
+    &.slow {
+        color: #f44336;
+    }
+}
+
+.uptime-cell {
+    .uptime-percentage {
+        font-weight: 600;
+        font-size: 0.875rem;
+
+        &.good {
+            color: #4caf50;
+        }
+
+        &.warning {
+            color: #ff9800;
+        }
+
+        &.poor {
+            color: #f44336;
+        }
+    }
+}
+
+.last-check-cell {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+// Row styles
+.monitor-row {
+    transition: all 0.3s ease;
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.02);
+    }
+
+    &.monitor-up {
+        border-left: 4px solid #4caf50;
+    }
+
+    &.monitor-down {
+        border-left: 4px solid #f44336;
+    }
+
+    &.monitor-pending {
+        border-left: 4px solid #ff9800;
+    }
+
+    &.monitor-inactive {
+        opacity: 0.6;
+        background: rgba(0, 0, 0, 0.02);
+    }
+}
+
+// Loading state
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+
+    mat-spinner {
+        margin-bottom: 16px;
+    }
+
+    p {
+        color: #666;
+        margin: 0;
+    }
+}
+
+// Empty state
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 32px;
+    text-align: center;
+
+    mat-icon {
+        font-size: 4rem;
+        width: 4rem;
+        height: 4rem;
+        color: #ccc;
+        margin-bottom: 16px;
+    }
+
+    h3 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0 0 8px 0;
+        color: #333;
+    }
+
+    p {
+        color: #666;
+        margin: 0 0 24px 0;
+        font-size: 1rem;
+    }
+
+    button {
+        height: 48px;
+        font-weight: 600;
+    }
+}
+
+// Menu styles
+.delete-action {
+    color: #f44336 !important;
+
+    mat-icon {
+        color: #f44336 !important;
+    }
+}
+
+// Animations
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+// Responsive design
+@media (max-width: 1200px) {
+    .filters-row {
+        flex-wrap: wrap;
+
+        .search-field {
+            min-width: 250px;
+            flex: 1 1 250px;
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    .monitors-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+
+        .header-content {
+            text-align: center;
+        }
+    }
+
+    .filters-row {
+        flex-direction: column;
+
+        .search-field {
+            min-width: unset;
+        }
+
+        mat-form-field {
+            width: 100%;
+        }
+    }
+
+    .monitors-table {
+
+        .mat-column-url,
+        .mat-column-lastCheck {
+            display: none;
+        }
+    }
+
+    .name-cell {
+        .monitor-name {
+            font-size: 0.875rem;
+        }
+    }
+}
+
+@media (max-width: 480px) {
+    .monitors-container {
+        padding: 0 8px;
+    }
+
+    .monitors-table {
+
+        .mat-column-responseTime,
+        .mat-column-uptime {
+            display: none;
+        }
+    }
+}

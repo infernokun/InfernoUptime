@@ -1,0 +1,46 @@
+app:
+  version: 0.0.1
+
+server:
+  servlet:
+    context-path: /${URL_PREFIX:inferno-uptime-rest}
+
+spring:
+  application:
+    name: inferno-uptime-rest
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+# Common Inferno Uptime Configuration
+inferno:
+  uptime:
+    application-name: "InfernoUptime"
+    default-check-interval: ${UPTIME_CHECK_INTERVAL:30s}
+    max-timeout: ${UPTIME_MAX_TIMEOUT:30s}
+    max-redirects: ${UPTIME_MAX_REDIRECTS:5}
+    user-agent: "InfernoUptime/1.0"
+    retry-attempts: ${UPTIME_RETRY_ATTEMPTS:3}
+    concurrent-checks: ${UPTIME_CONCURRENT_CHECKS:50}
+    cleanup:
+      enabled: ${UPTIME_CLEANUP_ENABLED:true}
+      retention-days: ${UPTIME_RETENTION_DAYS:90}
+      schedule: "0 0 2 * * ?" # Daily at 2 AM
+    notifications:
+      enabled: ${NOTIFICATIONS_ENABLED:true}
+      email:
+        enabled: ${EMAIL_NOTIFICATIONS_ENABLED:false}
+      webhook:
+        enabled: ${WEBHOOK_NOTIFICATIONS_ENABLED:true}
+
+# Security Configuration
+security:
+  default-admin-username: ${DEFAULT_ADMIN_USERNAME:inferno-uptime_admin}
+  default-admin-password: ${DEFAULT_ADMIN_PASSWORD:password}
+  encryption-key: ${ENCRYPTION_KEY:change-me-in-production}
+  jwt:
+    expiration: ${JWT_EXPIRATION:86400} # 24 hours in seconds
+
+rsa:
+  private-key: ${RSA_PRIVATE_KEY_PATH:certs/private.pem}
+  public-key: ${RSA_PUBLIC_KEY_PATH:certs/public.pem}
+  enabled: ${RSA_KEYS_ENABLED:false}

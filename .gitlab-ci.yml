@@ -12,19 +12,7 @@ build-rest:
     - echo $DOCKER_HUB_ACCESS_TOKEN | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin
     - apk add --no-cache nodejs npm bash jq
   script:
-    - cd inferno-template-rest
-    - npm run docker:build
-  tags:
-    - docker
-
-build-python:
-  stage: build
-  image: docker:24.0.7
-  before_script:
-    - echo $DOCKER_HUB_ACCESS_TOKEN | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin
-    - apk add --no-cache nodejs npm bash jq
-  script:
-    - cd inferno-template-python
+    - cd inferno-uptime-rest
     - npm run docker:build
   tags:
     - docker
@@ -39,7 +27,7 @@ build-web:
     - echo $DOCKER_HUB_ACCESS_TOKEN  | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin
     - apk add --no-cache nodejs npm bash jq
   script:
-    - cd inferno-template-web
+    - cd inferno-uptime-web
     - npm run docker:build
   tags:
     - docker
@@ -55,7 +43,7 @@ deploy:
     - echo "$STAGE_SERVER_PRIVATE_KEY" | base64 --decode > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H "$STAGE_SERVER_HOST" >> ~/.ssh/known_hosts
-    - export DEPLOY_PATH="/home/$STAGE_SERVER_USER/inferno-template"
+    - export DEPLOY_PATH="/home/$STAGE_SERVER_USER/inferno-uptime"
   script:
     - echo "Testing SSH connectivity..."
     - ssh -i ~/.ssh/id_rsa "$STAGE_SERVER_USER@$STAGE_SERVER_HOST" "echo Connected"
