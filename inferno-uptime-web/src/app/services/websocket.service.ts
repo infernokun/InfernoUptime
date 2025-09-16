@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, timer } from 'rxjs';
 import { Client, Message, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { EnvironmentService } from './environment.service';
@@ -43,97 +43,195 @@ export class WebSocketService {
   private dashboardSubject = new Subject<DashboardSummary>();
   private alertsSubject = new Subject<SystemAlert>();
   private subscriptions: StompSubscription[] = [];
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 10;
+  private isManuallyDisconnected = false;
 
   constructor(private environmentService: EnvironmentService) {
-    this.initializeClient();
+    console.log('🔌 WebSocket Service initialized');
   }
 
   private initializeClient() {
+    console.log('🔌 Initializing WebSocket client...');
+    
+    const websocketUrl = this.environmentService.settings?.websocketUrl;
+    if (!websocketUrl) {
+      console.error('❌ WebSocket URL not configured');
+      return;
+    }
+
+    console.log('🔌 Connecting to:', websocketUrl);
+
     this.client = new Client({
-      webSocketFactory: () => new SockJS(this.environmentService.settings!.websocketUrl),
+      webSocketFactory: () => {
+        console.log('🔌 Creating SockJS connection...');
+        return new SockJS(websocketUrl);
+      },
       connectHeaders: {},
       debug: (str) => {
-        console.log('STOMP Debug:', str);
+        if (str.includes('ERROR') || str.includes('RECEIPT')) {
+          console.log('🔌 STOMP Debug:', str);
+        }
       },
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
+      onConnect: (frame) => {
+        console.log('✅ WebSocket Connected successfully:', frame.headers);
+        this.reconnectAttempts = 0;
+        this.connectionSubject.next(true);
+        this.subscribeToTopics();
+      },
+      onStompError: (frame) => {
+        console.error('❌ STOMP Protocol Error:', frame.headers);
+        console.error('❌ Error body:', frame.body);
+        this.connectionSubject.next(false);
+        this.handleReconnection();
+      },
+      onWebSocketError: (event) => {
+        console.error('❌ WebSocket Error:', event);
+        this.connectionSubject.next(false);
+        this.handleReconnection();
+      },
+      onDisconnect: (frame) => {
+        console.log('🔌 WebSocket Disconnected:', frame?.headers || 'No frame');
+        this.connectionSubject.next(false);
+        if (!this.isManuallyDisconnected) {
+          this.handleReconnection();
+        }
+      },
+      onWebSocketClose: (event) => {
+        console.log('🔌 WebSocket closed:', event.code, event.reason);
+        this.connectionSubject.next(false);
+      }
     });
+  }
 
-    this.client.onConnect = (frame) => {
-      console.log(' WebSocket Connected:', frame);
-      this.connectionSubject.next(true);
-      this.subscribeToTopics();
-    };
+  private handleReconnection() {
+    if (this.isManuallyDisconnected) {
+      return;
+    }
 
-    this.client.onStompError = (frame) => {
-      console.error(' WebSocket STOMP Error:', frame);
-      this.connectionSubject.next(false);
-    };
-
-    this.client.onWebSocketError = (event) => {
-      console.error(' WebSocket Error:', event);
-      this.connectionSubject.next(false);
-    };
-
-    this.client.onDisconnect = (frame) => {
-      console.log(' WebSocket Disconnected:', frame);
-      this.connectionSubject.next(false);
-    };
+    this.reconnectAttempts++;
+    if (this.reconnectAttempts <= this.maxReconnectAttempts) {
+      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+      console.log(`🔄 Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms...`);
+      
+      timer(delay).subscribe(() => {
+        if (!this.isManuallyDisconnected && !this.client.active) {
+          this.client.activate();
+        }
+      });
+    } else {
+      console.error('❌ Max reconnection attempts reached');
+    }
   }
 
   connect(): Observable<boolean> {
-    if (!this.client.active) {
-      this.client.activate();
+    console.log('🔌 WebSocket connect() called');
+    this.isManuallyDisconnected = false;
+    
+    if (!this.client.connected) {
+      this.initializeClient();
+      
+      if (this.client && !this.client.active) {
+        console.log('🔌 Activating WebSocket client...');
+        try {
+          this.client.activate();
+        } catch (error) {
+          console.error('❌ Error activating WebSocket client:', error);
+          this.connectionSubject.next(false);
+        }
+      } else {
+        console.log('🔌 WebSocket client already active');
+      }
+    } else {
+      console.log('🔌 WebSocket already connected');
+      this.connectionSubject.next(true);
     }
+    
     return this.connectionSubject.asObservable();
   }
 
   disconnect() {
-    this.subscriptions.forEach(sub => sub.unsubscribe());
+    console.log('🔌 Manually disconnecting WebSocket...');
+    this.isManuallyDisconnected = true;
+    
+    // Clear all subscriptions
+    this.subscriptions.forEach(sub => {
+      try {
+        sub.unsubscribe();
+      } catch (error) {
+        console.error('Error unsubscribing:', error);
+      }
+    });
     this.subscriptions = [];
     
-    if (this.client.active) {
-      this.client.deactivate();
+    // Deactivate client
+    if (this.client?.active) {
+      try {
+        this.client.deactivate();
+      } catch (error) {
+        console.error('Error deactivating client:', error);
+      }
     }
+    
+    this.connectionSubject.next(false);
   }
 
   private subscribeToTopics() {
+    console.log('🔌 Subscribing to WebSocket topics...');
+    
     // Clear existing subscriptions
-    this.subscriptions.forEach(sub => sub.unsubscribe());
+    this.subscriptions.forEach(sub => {
+      try {
+        sub.unsubscribe();
+      } catch (error) {
+        console.error('Error unsubscribing from topic:', error);
+      }
+    });
     this.subscriptions = [];
 
-    // Subscribe to monitor updates
-    const monitorSub = this.client.subscribe('/topic/monitors/updates', (message: Message) => {
-      try {
-        const update: MonitorUpdate = JSON.parse(message.body);
-        this.monitorUpdatesSubject.next(update);
-      } catch (error) {
-        console.error('Error parsing monitor update:', error);
-      }
-    });
+    try {
+      // Subscribe to monitor updates
+      const monitorSub = this.client.subscribe('/topic/monitors/updates', (message: Message) => {
+        try {
+          const update: MonitorUpdate = JSON.parse(message.body);
+          console.log('📊 Monitor update received:', update.monitorName, update.isUp ? 'UP' : 'DOWN');
+          this.monitorUpdatesSubject.next(update);
+        } catch (error) {
+          console.error('❌ Error parsing monitor update:', error);
+        }
+      });
 
-    // Subscribe to dashboard updates
-    const dashboardSub = this.client.subscribe('/topic/dashboard', (message: Message) => {
-      try {
-        const summary: DashboardSummary = JSON.parse(message.body);
-        this.dashboardSubject.next(summary);
-      } catch (error) {
-        console.error('Error parsing dashboard update:', error);
-      }
-    });
+      // Subscribe to dashboard updates
+      const dashboardSub = this.client.subscribe('/topic/dashboard', (message: Message) => {
+        try {
+          const summary: DashboardSummary = JSON.parse(message.body);
+          console.log('📈 Dashboard update received:', summary);
+          this.dashboardSubject.next(summary);
+        } catch (error) {
+          console.error('❌ Error parsing dashboard update:', error);
+        }
+      });
 
-    // Subscribe to system alerts
-    const alertsSub = this.client.subscribe('/topic/alerts', (message: Message) => {
-      try {
-        const alert: SystemAlert = JSON.parse(message.body);
-        this.alertsSubject.next(alert);
-      } catch (error) {
-        console.error('Error parsing system alert:', error);
-      }
-    });
+      // Subscribe to system alerts
+      const alertsSub = this.client.subscribe('/topic/alerts', (message: Message) => {
+        try {
+          const alert: SystemAlert = JSON.parse(message.body);
+          console.log('🚨 System alert received:', alert);
+          this.alertsSubject.next(alert);
+        } catch (error) {
+          console.error('❌ Error parsing system alert:', error);
+        }
+      });
 
-    this.subscriptions.push(monitorSub, dashboardSub, alertsSub);
+      this.subscriptions.push(monitorSub, dashboardSub, alertsSub);
+      console.log('✅ Successfully subscribed to all topics');
+      
+    } catch (error) {
+      console.error('❌ Error subscribing to topics:', error);
+    }
   }
 
   // Observable getters
@@ -152,42 +250,60 @@ export class WebSocketService {
   subscribeToSpecificMonitor(monitorId: number): Observable<MonitorUpdate> {
     return new Observable(observer => {
       if (!this.client.active) {
+        console.error('❌ Cannot subscribe to specific monitor: WebSocket not connected');
         observer.error('WebSocket not connected');
-        return;
+        return () => {}; // Return empty cleanup function
       }
 
-      const subscription = this.client.subscribe(`/topic/monitors/${monitorId}`, (message: Message) => {
-        try {
-          const update: MonitorUpdate = JSON.parse(message.body);
-          observer.next(update);
-        } catch (error) {
-          observer.error('Error parsing monitor update: ' + error);
-        }
-      });
+      console.log(`🔌 Subscribing to specific monitor: ${monitorId}`);
+      
+      try {
+        const subscription = this.client.subscribe(`/topic/monitors/${monitorId}`, (message: Message) => {
+          try {
+            const update: MonitorUpdate = JSON.parse(message.body);
+            console.log(`📊 Specific monitor update for ${monitorId}:`, update);
+            observer.next(update);
+          } catch (error) {
+            console.error('❌ Error parsing specific monitor update:', error);
+            observer.error('Error parsing monitor update: ' + error);
+          }
+        });
 
-      // Return cleanup function
-      return () => {
-        subscription.unsubscribe();
-      };
+        // Return cleanup function
+        return () => {
+          console.log(`🔌 Unsubscribing from specific monitor: ${monitorId}`);
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error('❌ Error subscribing to specific monitor:', error);
+        observer.error('Error subscribing to monitor: ' + error);
+        return () => {}; // Return empty cleanup function
+      }
     });
   }
 
   // Send messages to server
   sendPing() {
     if (this.client.active) {
+      console.log('🏓 Sending ping...');
       this.client.publish({
         destination: '/app/ping',
         body: JSON.stringify({ timestamp: Date.now() })
       });
+    } else {
+      console.warn('⚠️ Cannot send ping: WebSocket not connected');
     }
   }
 
   requestMonitorTest(testData: any) {
     if (this.client.active) {
+      console.log('🧪 Requesting monitor test...');
       this.client.publish({
         destination: '/app/monitor/test',
         body: JSON.stringify(testData)
       });
+    } else {
+      console.warn('⚠️ Cannot request monitor test: WebSocket not connected');
     }
   }
 
@@ -198,5 +314,24 @@ export class WebSocketService {
 
   getConnectionStatus(): Observable<boolean> {
     return this.connectionSubject.asObservable();
+  }
+
+  // Debugging helpers
+  getConnectionInfo() {
+    return {
+      active: this.client.active,
+      connected: this.client.connected,
+      reconnectAttempts: this.reconnectAttempts,
+      isManuallyDisconnected: this.isManuallyDisconnected,
+      subscriptionsCount: this.subscriptions.length
+    };
+  }
+
+  forceReconnect() {
+    console.log('🔄 Forcing WebSocket reconnection...');
+    this.disconnect();
+    setTimeout(() => {
+      this.connect();
+    }, 1000);
   }
 }

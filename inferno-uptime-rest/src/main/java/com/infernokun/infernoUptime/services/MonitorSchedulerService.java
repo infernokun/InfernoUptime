@@ -2,6 +2,7 @@ package com.infernokun.infernoUptime.services;
 
 import com.infernokun.infernoUptime.models.entity.Monitor;
 import com.infernokun.infernoUptime.repositories.MonitorRepository;
+import jakarta.persistence.Cacheable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,11 +29,18 @@ public class MonitorSchedulerService {
     private final MonitorCheckService monitorCheckService;
     private final CacheService cacheService;
 
+    // Add default values to prevent null issues
     @Value("${inferno.uptime.concurrent-checks:50}")
     private int maxConcurrentChecks;
 
     @Value("${inferno.uptime.thread-pool-size:20}")
     private int threadPoolSize;
+
+    @Value("${inferno.uptime.cleanup.enabled:true}")
+    private boolean cleanupEnabled;
+
+    @Value("${inferno.uptime.cleanup.retention-days:90}")
+    private int retentionDays;
 
     private ScheduledExecutorService schedulerExecutor;
     private ThreadPoolTaskExecutor checkExecutor;
@@ -42,27 +50,58 @@ public class MonitorSchedulerService {
     @PostConstruct
     public void initialize() {
         log.info("Initializing Monitor Scheduler Service");
-
-        // Create scheduler thread pool
-        schedulerExecutor = new ScheduledThreadPoolExecutor(2, r -> {
-            Thread t = new Thread(r, "monitor-scheduler");
-            t.setDaemon(true);
-            return t;
-        });
-
-        // Create check execution thread pool
-        checkExecutor = new ThreadPoolTaskExecutor();
-        checkExecutor.setCorePoolSize(threadPoolSize);
-        checkExecutor.setMaxPoolSize(maxConcurrentChecks);
-        checkExecutor.setQueueCapacity(200);
-        checkExecutor.setThreadNamePrefix("monitor-check-");
-        checkExecutor.setRejectedExecutionHandler((r, executor) -> {
-            log.warn("Monitor check task rejected due to thread pool limits");
-        });
-        checkExecutor.initialize();
-
-        log.info("Monitor Scheduler initialized with {} threads, max {} concurrent checks",
+        log.info("Configuration - Thread Pool Size: {}, Max Concurrent Checks: {}",
                 threadPoolSize, maxConcurrentChecks);
+
+        // Validate configuration values
+        if (threadPoolSize <= 0) {
+            log.warn("Invalid thread pool size: {}, using default: 20", threadPoolSize);
+            threadPoolSize = 20;
+        }
+
+        if (maxConcurrentChecks <= 0) {
+            log.warn("Invalid max concurrent checks: {}, using default: 50", maxConcurrentChecks);
+            maxConcurrentChecks = 50;
+        }
+
+        // Ensure maxConcurrentChecks is at least as large as threadPoolSize
+        if (maxConcurrentChecks < threadPoolSize) {
+            log.warn("Max concurrent checks ({}) is less than thread pool size ({}), adjusting to {}",
+                    maxConcurrentChecks, threadPoolSize, threadPoolSize);
+            maxConcurrentChecks = threadPoolSize;
+        }
+
+        try {
+            // Create scheduler thread pool
+            schedulerExecutor = new ScheduledThreadPoolExecutor(2, r -> {
+                Thread t = new Thread(r, "monitor-scheduler");
+                t.setDaemon(true);
+                return t;
+            });
+
+            // Create check execution thread pool with explicit validation
+            checkExecutor = new ThreadPoolTaskExecutor();
+            checkExecutor.setCorePoolSize(threadPoolSize);
+            checkExecutor.setMaxPoolSize(maxConcurrentChecks);
+            checkExecutor.setQueueCapacity(200);
+            checkExecutor.setThreadNamePrefix("monitor-check-");
+            checkExecutor.setRejectedExecutionHandler((r, executor) -> {
+                log.warn("Monitor check task rejected due to thread pool limits");
+            });
+
+            // Add this to prevent the null pointer exception
+            checkExecutor.setWaitForTasksToCompleteOnShutdown(true);
+            checkExecutor.setAwaitTerminationSeconds(30);
+
+            checkExecutor.initialize();
+
+            log.info("Monitor Scheduler initialized successfully with {} core threads, max {} concurrent checks",
+                    threadPoolSize, maxConcurrentChecks);
+
+        } catch (Exception e) {
+            log.error("Failed to initialize Monitor Scheduler Service", e);
+            throw new RuntimeException("Could not initialize scheduler", e);
+        }
     }
 
     @PreDestroy
@@ -154,11 +193,25 @@ public class MonitorSchedulerService {
     }
 
     private List<Monitor> getActiveMonitors() {
-        List<Monitor> monitors = cacheService.getActiveMonitors();
-        if (monitors.isEmpty()) {
-            monitors = monitorRepository.findByIsActiveTrueOrderByNameAsc();
-            cacheService.cacheActiveMonitors(monitors);
+        try {
+            List<Monitor> monitors = cacheService.getActiveMonitors();
+            if (monitors != null && !monitors.isEmpty()) {
+                return monitors;
+            }
+        } catch (Exception e) {
+            log.warn("Cache retrieval failed, fetching from database: {}", e.getMessage());
         }
+
+        // Always fallback to database
+        List<Monitor> monitors = monitorRepository.findByIsActiveTrueOrderByNameAsc();
+
+        // Try to update cache, but don't fail if it doesn't work
+        try {
+            cacheService.cacheActiveMonitors(monitors);
+        } catch (Exception e) {
+            log.warn("Failed to update cache: {}", e.getMessage());
+        }
+
         return monitors;
     }
 
@@ -176,6 +229,12 @@ public class MonitorSchedulerService {
 
     private void scheduleCheck(Monitor monitor) {
         try {
+            // Add null check for checkExecutor
+            if (checkExecutor == null) {
+                log.error("Check executor is not initialized, cannot schedule check for monitor: {}", monitor.getName());
+                return;
+            }
+
             checkExecutor.execute(() -> {
                 try {
                     log.debug("Executing check for monitor: {} ({})", monitor.getName(), monitor.getUrl());
@@ -221,6 +280,16 @@ public class MonitorSchedulerService {
      * Get scheduler status and statistics
      */
     public SchedulerStatus getStatus() {
+        if (checkExecutor == null) {
+            return SchedulerStatus.builder()
+                    .running(false)
+                    .activeThreads(0)
+                    .maxThreads(0)
+                    .queuedTasks(0)
+                    .totalScheduledMonitors(0)
+                    .build();
+        }
+
         int activeThreads = checkExecutor.getActiveCount();
         int queuedTasks = checkExecutor.getThreadPoolExecutor().getQueue().size();
         int totalScheduledChecks = lastCheckTimes.size();
@@ -233,12 +302,6 @@ public class MonitorSchedulerService {
                 .totalScheduledMonitors(totalScheduledChecks)
                 .build();
     }
-
-    @Value("${inferno.uptime.cleanup.enabled:true}")
-    private boolean cleanupEnabled;
-
-    @Value("${inferno.uptime.cleanup.retention-days:90}")
-    private int retentionDays;
 
     private boolean isCleanupEnabled() {
         return cleanupEnabled;

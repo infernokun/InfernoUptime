@@ -1,18 +1,23 @@
-import { bootstrapApplication } from '@angular/platform-browser';
-import { provideRouter } from '@angular/router';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { importProvidersFrom } from '@angular/core';
-import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 
-import { AppComponent } from './app/app.component';
-import { routes } from './app/app-routing.module';
+import { AppModule } from './app/app.module';
 
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideRouter(routes),
-    provideHttpClient(withInterceptorsFromDi()),
-    provideAnimationsAsync(),
-    importProvidersFrom(MatSnackBarModule)
-  ]
-}).catch(err => console.error(err));
+platformBrowserDynamic()
+  .bootstrapModule(AppModule, {
+    ngZoneEventCoalescing: true,
+  })
+  .catch((err) => console.error(err));
+
+(window as any).MonacoEnvironment = {
+  getWorkerUrl: function (_moduleId: any, label: any) {
+    return '/assets/monaco-editor/min/vs/base/worker/workerMain.js';
+  },
+};
+
+const originalConsoleError = console.error;
+console.error = function (...args: any[]) {
+  if (args[1] && args[1].toString().includes("L is null")) {
+    return; // Suppress the Monaco bug message
+  }
+  originalConsoleError.apply(console, args);
+};

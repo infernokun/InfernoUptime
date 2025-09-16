@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -21,7 +22,7 @@ public class CacheService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     private static final String MONITOR_CACHE_PREFIX = "monitor:";
-    private static final String ACTIVE_MONITORS_KEY = "monitors:active";
+    private static final String ACTIVE_MONITORS_KEY = "monitors:active"; // Use this consistently
     private static final String MONITOR_STATS_PREFIX = "stats:";
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
@@ -51,26 +52,69 @@ public class CacheService {
         redisTemplate.delete(key);
     }
 
-    @Cacheable(value = "activeMonitors", key = "'all'")
+    // Remove @Cacheable to avoid Spring cache conflicts and use manual Redis caching
     public List<Monitor> getActiveMonitors() {
         log.debug("Retrieving active monitors from cache");
 
-        @SuppressWarnings("unchecked")
-        List<Monitor> monitors = (List<Monitor>) redisTemplate.opsForValue().get(ACTIVE_MONITORS_KEY);
-        return monitors != null ? monitors : List.of();
+        try {
+            @SuppressWarnings("unchecked")
+            List<Monitor> monitors = (List<Monitor>) redisTemplate.opsForValue().get(ACTIVE_MONITORS_KEY);
+
+            if (monitors != null && !monitors.isEmpty()) {
+                log.debug("Retrieved {} monitors from cache", monitors.size());
+                return monitors;
+            }
+
+            log.debug("No monitors found in cache or cache empty");
+            return Collections.emptyList();
+
+        } catch (Exception e) {
+            log.warn("Cache retrieval failed: {}", e.getMessage());
+
+            // Clear the problematic cache entry
+            try {
+                redisTemplate.delete(ACTIVE_MONITORS_KEY);
+                log.debug("Cleared corrupted cache entry");
+            } catch (Exception clearEx) {
+                log.warn("Failed to clear cache: {}", clearEx.getMessage());
+            }
+
+            return Collections.emptyList();
+        }
     }
 
     public void cacheActiveMonitors(List<Monitor> monitors) {
-        log.debug("Caching {} active monitors", monitors.size());
+        // Don't cache empty lists to avoid deserialization issues
+        if (monitors == null || monitors.isEmpty()) {
+            log.debug("Skipping cache update for empty monitor list");
 
-        redisTemplate.opsForValue().set(ACTIVE_MONITORS_KEY, monitors,
-                CACHE_TTL.toMinutes(), TimeUnit.MINUTES);
+            // Also clear any existing cache entry to prevent stale data
+            try {
+                redisTemplate.delete(ACTIVE_MONITORS_KEY);
+                log.debug("Cleared existing cache entry for empty monitor list");
+            } catch (Exception e) {
+                log.warn("Failed to clear cache entry: {}", e.getMessage());
+            }
+            return;
+        }
+
+        try {
+            // Use consistent key - ACTIVE_MONITORS_KEY instead of hardcoded string
+            redisTemplate.opsForValue().set(ACTIVE_MONITORS_KEY, monitors, 5, TimeUnit.MINUTES);
+            log.debug("Cached {} active monitors", monitors.size());
+        } catch (Exception e) {
+            log.warn("Failed to cache active monitors: {}", e.getMessage());
+        }
     }
 
-    @CacheEvict(value = "activeMonitors", key = "'all'")
+    // Remove @CacheEvict to avoid Spring cache conflicts
     public void evictActiveMonitors() {
         log.debug("Evicting active monitors from cache");
-        redisTemplate.delete(ACTIVE_MONITORS_KEY);
+        try {
+            redisTemplate.delete(ACTIVE_MONITORS_KEY);
+        } catch (Exception e) {
+            log.warn("Failed to evict active monitors cache: {}", e.getMessage());
+        }
     }
 
     // Monitor statistics caching
@@ -125,11 +169,21 @@ public class CacheService {
         clearPattern(MONITOR_CACHE_PREFIX + "*");
         clearPattern(MONITOR_STATS_PREFIX + "*");
         clearPattern("checks:recent:*");
+
+        // Also clear any legacy cache keys that might be causing issues
+        try {
+            redisTemplate.delete("activeMonitors"); // Clear the old key
+        } catch (Exception e) {
+            log.debug("Legacy cache key cleanup failed (normal): {}", e.getMessage());
+        }
     }
 
     private void clearPattern(String pattern) {
         try {
-            redisTemplate.delete(redisTemplate.keys(pattern));
+            var keys = redisTemplate.keys(pattern);
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
         } catch (Exception e) {
             log.warn("Failed to clear cache pattern {}: {}", pattern, e.getMessage());
         }
@@ -144,6 +198,17 @@ public class CacheService {
         } catch (Exception e) {
             log.error("Cache health check failed", e);
             return false;
+        }
+    }
+
+    // Method to manually clear the problematic cache entry
+    public void clearActiveMonitorsCache() {
+        try {
+            redisTemplate.delete(ACTIVE_MONITORS_KEY);
+            redisTemplate.delete("activeMonitors"); // Clear legacy key too
+            log.info("Cleared active monitors cache entries");
+        } catch (Exception e) {
+            log.warn("Failed to clear active monitors cache: {}", e.getMessage());
         }
     }
 }

@@ -1,0 +1,758 @@
+<div class="add-monitor-dialog">
+    <h2 mat-dialog-title>
+        <mat-icon>{{ isEditMode ? 'edit' : 'add' }}</mat-icon>
+        {{ isEditMode ? 'Edit Monitor' : 'Add New Monitor' }}
+    </h2>
+
+    <mat-dialog-content>
+        <mat-stepper #stepper orientation="vertical" linear="false" class="monitor-stepper">
+            <!-- Step 1: Basic Configuration -->
+            <mat-step [stepControl]="basicForm" label="Basic Configuration" [completed]="basicForm.valid">
+                <ng-template matStepLabel>
+                    <span>Basic Configuration</span>
+                    <mat-icon class="step-icon" *ngIf="basicForm.valid">check_circle</mat-icon>
+                </ng-template>
+
+                <form [formGroup]="basicForm" class="form-section">
+                    <div class="form-row">
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Monitor Name</mat-label>
+                            <input matInput formControlName="name" placeholder="e.g., My Website" maxlength="255">
+                            <mat-hint align="end">{{ basicForm.get('name')?.value?.length || 0 }}/255</mat-hint>
+                            <mat-error *ngIf="basicForm.get('name')?.hasError('required')">
+                                Monitor name is required
+                            </mat-error>
+                        </mat-form-field>
+                    </div>
+
+                    <div class="form-row">
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Monitor Type</mat-label>
+                            <mat-select formControlName="type" (selectionChange)="onTypeChange()">
+                                <mat-optgroup label="General Monitor Types">
+                                    <mat-option value="group">
+                                        <mat-icon>folder</mat-icon>
+                                        Group
+                                    </mat-option>
+                                    <mat-option value="http">
+                                        <mat-icon>http</mat-icon>
+                                        HTTP(s)
+                                    </mat-option>
+                                    <mat-option value="port">
+                                        <mat-icon>settings_ethernet</mat-icon>
+                                        TCP Port
+                                    </mat-option>
+                                    <mat-option value="ping">
+                                        <mat-icon>network_ping</mat-icon>
+                                        Ping
+                                    </mat-option>
+                                    <mat-option value="keyword">
+                                        <mat-icon>search</mat-icon>
+                                        HTTP(s) - Keyword
+                                    </mat-option>
+                                    <mat-option value="json-query">
+                                        <mat-icon>code</mat-icon>
+                                        HTTP(s) - JSON Query
+                                    </mat-option>
+                                    <mat-option value="grpc-keyword">
+                                        <mat-icon>api</mat-icon>
+                                        gRPC(s) - Keyword
+                                    </mat-option>
+                                    <mat-option value="dns">
+                                        <mat-icon>dns</mat-icon>
+                                        DNS
+                                    </mat-option>
+                                    <mat-option value="docker">
+                                        <mat-icon>developer_board</mat-icon>
+                                        Docker Container
+                                    </mat-option>
+                                    <mat-option value="real-browser">
+                                        <mat-icon>web</mat-icon>
+                                        HTTP(s) - Browser Engine (Beta)
+                                    </mat-option>
+                                </mat-optgroup>
+
+                                <mat-optgroup label="Passive Monitor Types">
+                                    <mat-option value="push">
+                                        <mat-icon>push_pin</mat-icon>
+                                        Push
+                                    </mat-option>
+                                </mat-optgroup>
+
+                                <mat-optgroup label="Specific Monitor Types">
+                                    <mat-option value="steam">
+                                        <mat-icon>sports_esports</mat-icon>
+                                        Steam Game Server
+                                    </mat-option>
+                                    <mat-option value="gamedig">
+                                        <mat-icon>games</mat-icon>
+                                        GameDig
+                                    </mat-option>
+                                    <mat-option value="mqtt">
+                                        <mat-icon>device_hub</mat-icon>
+                                        MQTT
+                                    </mat-option>
+                                    <mat-option value="kafka-producer">
+                                        <mat-icon>stream</mat-icon>
+                                        Kafka Producer
+                                    </mat-option>
+                                    <mat-option value="sqlserver">
+                                        <mat-icon>storage</mat-icon>
+                                        Microsoft SQL Server
+                                    </mat-option>
+                                    <mat-option value="postgres">
+                                        <mat-icon>storage</mat-icon>
+                                        PostgreSQL
+                                    </mat-option>
+                                    <mat-option value="mysql">
+                                        <mat-icon>storage</mat-icon>
+                                        MySQL/MariaDB
+                                    </mat-option>
+                                    <mat-option value="mongodb">
+                                        <mat-icon>storage</mat-icon>
+                                        MongoDB
+                                    </mat-option>
+                                    <mat-option value="radius">
+                                        <mat-icon>security</mat-icon>
+                                        Radius
+                                    </mat-option>
+                                    <mat-option value="redis">
+                                        <mat-icon>memory</mat-icon>
+                                        Redis
+                                    </mat-option>
+                                </mat-optgroup>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <!-- Dynamic fields based on monitor type -->
+                    <ng-container [ngSwitch]="selectedMonitorType">
+
+                        <!-- HTTP/HTTPS Fields -->
+                        <ng-container *ngSwitchCase="'http'">
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>URL to Monitor</mat-label>
+                                    <input matInput formControlName="url" placeholder="https://example.com"
+                                        (blur)="validateUrl()">
+                                    <mat-icon matSuffix>link</mat-icon>
+                                    <mat-error *ngIf="basicForm.get('url')?.hasError('required')">
+                                        URL is required
+                                    </mat-error>
+                                    <mat-error *ngIf="basicForm.get('url')?.hasError('pattern')">
+                                        Please enter a valid URL (must start with http:// or https://)
+                                    </mat-error>
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- TCP Port Fields -->
+                        <ng-container *ngSwitchCase="'port'">
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Hostname/IP</mat-label>
+                                    <input matInput formControlName="hostname" placeholder="example.com">
+                                    <mat-icon matSuffix>computer</mat-icon>
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Port</mat-label>
+                                    <input matInput formControlName="port" type="number" placeholder="80">
+                                    <mat-icon matSuffix>settings_ethernet</mat-icon>
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Ping Fields -->
+                        <ng-container *ngSwitchCase="'ping'">
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Hostname/IP</mat-label>
+                                    <input matInput formControlName="hostname" placeholder="google.com">
+                                    <mat-icon matSuffix>network_ping</mat-icon>
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Keyword Fields -->
+                        <ng-container *ngSwitchCase="'keyword'">
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>URL to Monitor</mat-label>
+                                    <input matInput formControlName="url" placeholder="https://example.com">
+                                    <mat-icon matSuffix>link</mat-icon>
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Keyword to Search</mat-label>
+                                    <input matInput formControlName="keyword" placeholder="success">
+                                    <mat-icon matSuffix>search</mat-icon>
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- JSON Query Fields -->
+                        <ng-container *ngSwitchCase="'json-query'">
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>JSON API URL</mat-label>
+                                    <input matInput formControlName="url" placeholder="https://api.example.com/status">
+                                    <mat-icon matSuffix>api</mat-icon>
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>JSON Path Query</mat-label>
+                                    <input matInput formControlName="jsonPath" placeholder="$.status">
+                                    <mat-icon matSuffix>code</mat-icon>
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Expected Value</mat-label>
+                                    <input matInput formControlName="expectedValue" placeholder="ok">
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- DNS Fields -->
+                        <ng-container *ngSwitchCase="'dns'">
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Hostname to Resolve</mat-label>
+                                    <input matInput formControlName="hostname" placeholder="google.com">
+                                    <mat-icon matSuffix>dns</mat-icon>
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>DNS Server</mat-label>
+                                    <input matInput formControlName="dnsServer" placeholder="8.8.8.8">
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Record Type</mat-label>
+                                    <mat-select formControlName="recordType">
+                                        <mat-option value="A">A</mat-option>
+                                        <mat-option value="AAAA">AAAA</mat-option>
+                                        <mat-option value="CNAME">CNAME</mat-option>
+                                        <mat-option value="MX">MX</mat-option>
+                                        <mat-option value="TXT">TXT</mat-option>
+                                        <mat-option value="NS">NS</mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Docker Fields -->
+                        <ng-container *ngSwitchCase="'docker'">
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Container Name/ID</mat-label>
+                                    <input matInput formControlName="dockerContainer" placeholder="my-container">
+                                    <mat-icon matSuffix>developer_board</mat-icon>
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Docker Host (Optional)</mat-label>
+                                    <input matInput formControlName="dockerHost"
+                                        placeholder="unix:///var/run/docker.sock">
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Database Fields (MySQL, PostgreSQL, SQL Server, MongoDB) -->
+                        <ng-container *ngSwitchCase="'mysql'">
+                            <div class="database-config">
+                                <div class="form-row two-columns">
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Host</mat-label>
+                                        <input matInput formControlName="dbHost" placeholder="localhost">
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Port</mat-label>
+                                        <input matInput formControlName="dbPort" type="number" placeholder="3306">
+                                    </mat-form-field>
+                                </div>
+                                <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Database Name</mat-label>
+                                        <input matInput formControlName="database" placeholder="mydb">
+                                    </mat-form-field>
+                                </div>
+                                <div class="form-row two-columns">
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Username</mat-label>
+                                        <input matInput formControlName="dbUsername" placeholder="user">
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Password</mat-label>
+                                        <input matInput formControlName="dbPassword" type="password">
+                                    </mat-form-field>
+                                </div>
+                                <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>SQL Query (Optional)</mat-label>
+                                        <textarea matInput formControlName="sqlQuery" rows="2"
+                                            placeholder="SELECT 1 as result"></textarea>
+                                    </mat-form-field>
+                                </div>
+                            </div>
+                        </ng-container>
+
+                        <!-- Similar structure for other database types -->
+                        <ng-container *ngSwitchCase="'postgres'">
+                            <div class="database-config">
+                                <div class="form-row two-columns">
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Host</mat-label>
+                                        <input matInput formControlName="dbHost" placeholder="localhost">
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Port</mat-label>
+                                        <input matInput formControlName="dbPort" type="number" placeholder="5432">
+                                    </mat-form-field>
+                                </div>
+                                <div class="form-row">
+                                    <mat-form-field appearance="outline" class="full-width">
+                                        <mat-label>Database Name</mat-label>
+                                        <input matInput formControlName="database" placeholder="postgres">
+                                    </mat-form-field>
+                                </div>
+                                <div class="form-row two-columns">
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Username</mat-label>
+                                        <input matInput formControlName="dbUsername" placeholder="postgres">
+                                    </mat-form-field>
+                                    <mat-form-field appearance="outline">
+                                        <mat-label>Password</mat-label>
+                                        <input matInput formControlName="dbPassword" type="password">
+                                    </mat-form-field>
+                                </div>
+                            </div>
+                        </ng-container>
+
+                        <!-- MQTT Fields -->
+                        <ng-container *ngSwitchCase="'mqtt'">
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>MQTT Broker Host</mat-label>
+                                    <input matInput formControlName="mqttHost" placeholder="localhost">
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Port</mat-label>
+                                    <input matInput formControlName="mqttPort" type="number" placeholder="1883">
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Topic</mat-label>
+                                    <input matInput formControlName="mqttTopic" placeholder="sensor/status">
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Username (Optional)</mat-label>
+                                    <input matInput formControlName="mqttUsername">
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Password (Optional)</mat-label>
+                                    <input matInput formControlName="mqttPassword" type="password">
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Steam Game Server -->
+                        <ng-container *ngSwitchCase="'steam'">
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Server IP</mat-label>
+                                    <input matInput formControlName="gameServerHost" placeholder="192.168.1.100">
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Query Port</mat-label>
+                                    <input matInput formControlName="gameServerPort" type="number" placeholder="27015">
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- GameDig -->
+                        <ng-container *ngSwitchCase="'gamedig'">
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Game Type</mat-label>
+                                    <mat-select formControlName="gameType">
+                                        <mat-option value="minecraft">Minecraft</mat-option>
+                                        <mat-option value="csgo">Counter-Strike: GO</mat-option>
+                                        <mat-option value="tf2">Team Fortress 2</mat-option>
+                                        <mat-option value="gmod">Garry's Mod</mat-option>
+                                        <mat-option value="rust">Rust</mat-option>
+                                        <mat-option value="ark">ARK: Survival Evolved</mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Server Host</mat-label>
+                                    <input matInput formControlName="gameServerHost" placeholder="server.example.com">
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Port</mat-label>
+                                    <input matInput formControlName="gameServerPort" type="number">
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Redis -->
+                        <ng-container *ngSwitchCase="'redis'">
+                            <div class="form-row two-columns">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Redis Host</mat-label>
+                                    <input matInput formControlName="redisHost" placeholder="localhost">
+                                </mat-form-field>
+                                <mat-form-field appearance="outline">
+                                    <mat-label>Port</mat-label>
+                                    <input matInput formControlName="redisPort" type="number" placeholder="6379">
+                                </mat-form-field>
+                            </div>
+                            <div class="form-row">
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Password (Optional)</mat-label>
+                                    <input matInput formControlName="redisPassword" type="password">
+                                </mat-form-field>
+                            </div>
+                        </ng-container>
+
+                        <!-- Push Monitor -->
+                        <ng-container *ngSwitchCase="'push'">
+                            <div class="push-monitor-info">
+                                <mat-icon>info</mat-icon>
+                                <div>
+                                    <h4>Push Monitor</h4>
+                                    <p>Push monitors wait for external systems to send status updates. A unique URL will
+                                        be generated for this monitor.</p>
+                                </div>
+                            </div>
+                        </ng-container>
+
+                        <!-- Group Monitor -->
+                        <ng-container *ngSwitchCase="'group'">
+                            <div class="group-monitor-info">
+                                <mat-icon>folder</mat-icon>
+                                <div>
+                                    <h4>Group Monitor</h4>
+                                    <p>Group monitors organize other monitors and provide aggregate status information.
+                                    </p>
+                                </div>
+                            </div>
+                        </ng-container>
+                    </ng-container>
+
+                    <!-- Common fields for all types -->
+                    <div class="form-row two-columns"
+                        *ngIf="selectedMonitorType !== 'group' && selectedMonitorType !== 'push'">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Check Interval</mat-label>
+                            <mat-select formControlName="checkInterval">
+                                <mat-option value="30">30 seconds</mat-option>
+                                <mat-option value="60">1 minute</mat-option>
+                                <mat-option value="120">2 minutes</mat-option>
+                                <mat-option value="300">5 minutes</mat-option>
+                                <mat-option value="600">10 minutes</mat-option>
+                                <mat-option value="1800">30 minutes</mat-option>
+                                <mat-option value="3600">1 hour</mat-option>
+                            </mat-select>
+                            <mat-hint>How often to check the monitor</mat-hint>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Timeout</mat-label>
+                            <mat-select formControlName="timeout">
+                                <mat-option value="5">5 seconds</mat-option>
+                                <mat-option value="10">10 seconds</mat-option>
+                                <mat-option value="15">15 seconds</mat-option>
+                                <mat-option value="30">30 seconds</mat-option>
+                                <mat-option value="60">1 minute</mat-option>
+                                <mat-option value="120">2 minutes</mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div class="form-row">
+                        <mat-form-field appearance="outline" class="full-width">
+                            <mat-label>Description (Optional)</mat-label>
+                            <textarea matInput formControlName="description" rows="3" maxlength="1000"
+                                placeholder="Brief description of what this monitor checks..."></textarea>
+                            <mat-hint align="end">{{ basicForm.get('description')?.value?.length || 0 }}/1000</mat-hint>
+                        </mat-form-field>
+                    </div>
+
+                    <div class="form-row">
+                        <mat-slide-toggle formControlName="isActive" color="primary" class="active-toggle">
+                            <span class="toggle-label">
+                                <mat-icon>{{ basicForm.get('isActive')?.value ? 'play_circle_filled' :
+                                    'pause_circle_filled' }}</mat-icon>
+                                {{ basicForm.get('isActive')?.value ? 'Monitor will be active after creation' : 'Monitor
+                                will be inactive after creation' }}
+                            </span>
+                        </mat-slide-toggle>
+                    </div>
+
+                    <div class="step-actions" *ngIf="canTestConnection()">
+                        <button mat-raised-button color="primary" (click)="testConnection()"
+                            [disabled]="!canTestConnection() || testing" class="test-button">
+                            <mat-spinner diameter="16" *ngIf="testing" class="button-spinner"></mat-spinner>
+                            <mat-icon *ngIf="!testing">play_arrow</mat-icon>
+                            Test Connection
+                        </button>
+
+                        <div class="test-result" *ngIf="testResult">
+                            <div class="test-success" *ngIf="testResult.success">
+                                <mat-icon>check_circle</mat-icon>
+                                <div class="test-details">
+                                    <span class="test-message">Connection successful!</span>
+                                    <span class="test-metrics">{{ testResult.responseTime }}ms • Status: {{
+                                        testResult.statusCode }}</span>
+                                </div>
+                            </div>
+                            <div class="test-error" *ngIf="!testResult.success">
+                                <mat-icon>error</mat-icon>
+                                <div class="test-details">
+                                    <span class="test-message">Connection failed</span>
+                                    <span class="test-error-message">{{ testResult.message }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </mat-step>
+
+            <!-- Step 2: Advanced Settings (conditional based on monitor type) -->
+            <mat-step [stepControl]="advancedForm" label="Advanced Settings" [optional]="true"
+                [completed]="advancedForm.valid" *ngIf="hasAdvancedSettings()">
+                <ng-template matStepLabel>
+                    <span>Advanced Settings</span>
+                    <mat-icon class="step-icon optional">settings</mat-icon>
+                </ng-template>
+
+                <form [formGroup]="advancedForm" class="form-section">
+                    <!-- HTTP-specific advanced settings -->
+                    <ng-container *ngIf="isHttpType()">
+                        <div class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Expected Status Codes</mat-label>
+                                <input matInput formControlName="expectedStatusCodes" placeholder="200,201,202,203,204">
+                                <mat-icon matSuffix
+                                    matTooltip="Common codes: 200 (OK), 201 (Created), 204 (No Content)">help</mat-icon>
+                                <mat-hint>Comma-separated list of acceptable HTTP status codes</mat-hint>
+                            </mat-form-field>
+                        </div>
+
+                        <div class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Custom Headers (Optional)</mat-label>
+                                <textarea matInput formControlName="customHeaders" rows="4"
+                                    placeholder='{"Authorization": "Bearer your-token", "User-Agent": "Custom-Agent"}'>
+                    </textarea>
+                                <mat-hint>JSON format for custom HTTP headers</mat-hint>
+                            </mat-form-field>
+                        </div>
+
+                        <div class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Max Redirects</mat-label>
+                                <mat-select formControlName="maxRedirects">
+                                    <mat-option value="0">0 (No redirects)</mat-option>
+                                    <mat-option value="1">1</mat-option>
+                                    <mat-option value="3">3</mat-option>
+                                    <mat-option value="5">5</mat-option>
+                                    <mat-option value="10">10</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+                    </ng-container>
+
+                    <!-- Database-specific advanced settings -->
+                    <ng-container *ngIf="isDatabaseType()">
+                        <div class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Connection Timeout (seconds)</mat-label>
+                                <input matInput formControlName="dbTimeout" type="number" value="30">
+                            </mat-form-field>
+                        </div>
+
+                        <div class="form-row">
+                            <mat-slide-toggle formControlName="sslEnabled" color="primary">
+                                <span class="toggle-label">
+                                    <mat-icon>security</mat-icon>
+                                    Enable SSL/TLS Connection
+                                </span>
+                            </mat-slide-toggle>
+                        </div>
+                    </ng-container>
+
+                    <!-- Network-specific advanced settings -->
+                    <ng-container *ngIf="isNetworkType()">
+                        <div class="form-row">
+                            <mat-form-field appearance="outline" class="full-width">
+                                <mat-label>Retry Count</mat-label>
+                                <mat-select formControlName="retryCount">
+                                    <mat-option value="1">1</mat-option>
+                                    <mat-option value="2">2</mat-option>
+                                    <mat-option value="3">3</mat-option>
+                                    <mat-option value="5">5</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                        </div>
+                    </ng-container>
+                </form>
+            </mat-step>
+
+            <!-- Step 3: Review & Save -->
+            <mat-step label="Review & Save" [completed]="false">
+                <ng-template matStepLabel>
+                    <span>Review & Save</span>
+                    <mat-icon class="step-icon">save</mat-icon>
+                </ng-template>
+
+                <div class="review-section">
+                    <h3>Review Your Monitor Configuration</h3>
+
+                    <div class="config-summary">
+                        <div class="config-group">
+                            <h4>{{ getMonitorTypeLabel() }} Configuration</h4>
+                            <div class="config-item">
+                                <span class="config-label">Name:</span>
+                                <span class="config-value">{{ basicForm.get('name')?.value || 'Not set' }}</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">Type:</span>
+                                <mat-chip selected color="primary">{{ getMonitorTypeLabel() }}</mat-chip>
+                            </div>
+
+                            <!-- Dynamic review fields based on monitor type -->
+                            <ng-container [ngSwitch]="selectedMonitorType">
+                                <div class="config-item" *ngSwitchCase="'http'">
+                                    <span class="config-label">URL:</span>
+                                    <span class="config-value url-value">{{ basicForm.get('url')?.value || 'Not set'
+                                        }}</span>
+                                </div>
+
+                                <ng-container *ngSwitchCase="'port'">
+                                    <div class="config-item">
+                                        <span class="config-label">Host:</span>
+                                        <span class="config-value">{{ basicForm.get('hostname')?.value || 'Not set'
+                                            }}</span>
+                                    </div>
+                                    <div class="config-item">
+                                        <span class="config-label">Port:</span>
+                                        <span class="config-value">{{ basicForm.get('port')?.value || 'Not set'
+                                            }}</span>
+                                    </div>
+                                </ng-container>
+
+                                <div class="config-item" *ngSwitchCase="'ping'">
+                                    <span class="config-label">Target:</span>
+                                    <span class="config-value">{{ basicForm.get('hostname')?.value || 'Not set'
+                                        }}</span>
+                                </div>
+
+                                <ng-container *ngSwitchCase="'mysql'">
+                                    <div class="config-item">
+                                        <span class="config-label">Host:</span>
+                                        <span class="config-value">{{ basicForm.get('dbHost')?.value }}:{{
+                                            basicForm.get('dbPort')?.value }}</span>
+                                    </div>
+                                    <div class="config-item">
+                                        <span class="config-label">Database:</span>
+                                        <span class="config-value">{{ basicForm.get('database')?.value }}</span>
+                                    </div>
+                                </ng-container>
+
+                                <!-- Add similar review sections for other types -->
+                            </ng-container>
+
+                            <div class="config-item" *ngIf="basicForm.get('checkInterval')?.value">
+                                <span class="config-label">Check Interval:</span>
+                                <span class="config-value">{{ formatInterval(basicForm.get('checkInterval')?.value)
+                                    }}</span>
+                            </div>
+
+                            <div class="config-item" *ngIf="basicForm.get('description')?.value">
+                                <span class="config-label">Description:</span>
+                                <span class="config-value">{{ basicForm.get('description')?.value }}</span>
+                            </div>
+
+                            <div class="config-item">
+                                <span class="config-label">Status:</span>
+                                <mat-chip [color]="basicForm.get('isActive')?.value ? 'primary' : 'warn'" selected>
+                                    <mat-icon>{{ basicForm.get('isActive')?.value ? 'play_circle_filled' :
+                                        'pause_circle_filled' }}</mat-icon>
+                                    {{ basicForm.get('isActive')?.value ? 'Active' : 'Inactive' }}
+                                </mat-chip>
+                            </div>
+                        </div>
+
+                        <!-- Advanced settings review -->
+                        <div class="config-group" *ngIf="hasAdvancedSettings() && hasAdvancedValues()">
+                            <h4>Advanced Settings</h4>
+                            <div class="config-item" *ngIf="advancedForm.get('expectedStatusCodes')?.value">
+                                <span class="config-label">Expected Status Codes:</span>
+                                <span class="config-value">{{ advancedForm.get('expectedStatusCodes')?.value }}</span>
+                            </div>
+                            <div class="config-item" *ngIf="advancedForm.get('customHeaders')?.value">
+                                <span class="config-label">Custom Headers:</span>
+                                <span class="config-value">Configured</span>
+                            </div>
+                            <div class="config-item" *ngIf="advancedForm.get('maxRedirects')?.value">
+                                <span class="config-label">Max Redirects:</span>
+                                <span class="config-value">{{ advancedForm.get('maxRedirects')?.value }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="final-test" *ngIf="canTestConnection() && (!testResult || !testResult.success)">
+                        <mat-icon class="warning-icon">warning</mat-icon>
+                        <div class="test-warning">
+                            <p><strong>Recommendation:</strong> Test your configuration before saving to ensure it works
+                                correctly.</p>
+                            <button mat-stroked-button (click)="testConnection()"
+                                [disabled]="testing || !canTestConnection()">
+                                <mat-spinner diameter="16" *ngIf="testing" class="button-spinner"></mat-spinner>
+                                <mat-icon *ngIf="!testing">play_arrow</mat-icon>
+                                Test Configuration
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="success-indicator" *ngIf="testResult?.success">
+                        <mat-icon class="success-icon">check_circle</mat-icon>
+                        <span>Configuration tested successfully! Ready to save.</span>
+                    </div>
+                </div>
+            </mat-step>
+        </mat-stepper>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end" class="dialog-actions">
+        <button mat-button (click)="onCancel()" class="cancel-button">
+            Cancel
+        </button>
+        <div class="action-spacer"></div>
+        <button mat-button (click)="stepper.previous()" *ngIf="stepper.selectedIndex > 0" class="previous-button">
+            <mat-icon>chevron_left</mat-icon>
+            Previous
+        </button>
+        <button mat-raised-button color="accent" (click)="stepper.next()"
+            *ngIf="stepper.selectedIndex < getMaxStepIndex()" [disabled]="!isCurrentStepValid()" class="next-button">
+            Next
+            <mat-icon>chevron_right</mat-icon>
+        </button>
+        <button mat-raised-button color="primary" (click)="onSave()" [disabled]="!isFormValid() || saving"
+            *ngIf="stepper.selectedIndex === getMaxStepIndex()" class="save-button">
+            <mat-spinner diameter="16" *ngIf="saving" class="button-spinner"></mat-spinner>
+            <mat-icon *ngIf="!saving">{{ isEditMode ? 'save' : 'add' }}</mat-icon>
+            {{ isEditMode ? 'Update Monitor' : 'Create Monitor' }}
+        </button>
+    </mat-dialog-actions>
+</div>

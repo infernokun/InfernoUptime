@@ -5,8 +5,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -15,7 +14,9 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
+@Builder
 @Table(name = "monitors")
+@AllArgsConstructor
 public class Monitor {
 
     @Id
@@ -36,9 +37,11 @@ public class Monitor {
 
     @Min(value = 10, message = "Check interval must be at least 10 seconds")
     @Column(name = "check_interval")
+    @Builder.Default
     private Integer checkInterval = 30; // seconds
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 
     @Column(name = "created_at")
@@ -52,15 +55,19 @@ public class Monitor {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "current_status")
+    @Builder.Default
     private MonitorStatus currentStatus = MonitorStatus.PENDING;
 
     @Column(name = "expected_status_codes")
+    @Builder.Default
     private String expectedStatusCodes = "200,201,202,203,204";
 
     @Column(name = "timeout_seconds")
+    @Builder.Default
     private Integer timeoutSeconds = 30;
 
     @Column(name = "max_redirects")
+    @Builder.Default
     private Integer maxRedirects = 5;
 
     @Column(columnDefinition = "TEXT")
@@ -74,6 +81,7 @@ public class Monitor {
 
     @OneToMany(mappedBy = "monitor", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
+    @Builder.Default
     private List<MonitorCheck> checks = new ArrayList<>();
 
     public enum MonitorType {

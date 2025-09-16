@@ -8,28 +8,33 @@ export interface EnvironmentSettings {
   baseEndPoint: string;
   websocketUrl: string;
 }
+
 @Injectable({
   providedIn: 'root',
 })
 export class EnvironmentService {
-  constructor(private http: HttpClient) { }
-
   configUrl = 'assets/environment/app.config.json';
   private configSettings: EnvironmentSettings | undefined = undefined;
+
+  constructor(private http: HttpClient) {}
 
   get settings() {
     return this.configSettings;
   }
 
-  public load(): Promise<any> {
+  public load(): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      this.http.get<EnvironmentSettings>(this.configUrl).subscribe((response: EnvironmentSettings) => {
-        this.configSettings = response;
-        console.log('getting env settings: ', this.configSettings);
-        resolve(true);
+      this.http.get<EnvironmentSettings>(this.configUrl).subscribe({
+        next: (response: EnvironmentSettings) => {
+          this.configSettings = response;
+          console.log('getting env settings: ', this.configSettings);
+          resolve(true);
+        },
+        error: (err: any) => {
+          console.error('Error reading configuration file: ', err);
+          reject(err);
+        }
       });
-    }).catch((err: any) => {
-      console.log('Error reading configuration file: ', err);
     });
   }
 }

@@ -40,8 +40,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://${DB_IP:localhost}:5432/${DB_NAME:inferno_uptime_dev}
-    username: ${DB_USER:inferno_user}
-    password: ${DB_PASS:inferno_pass}
+    username: ${DB_USER:amaterasu}
+    password: ${DB_PASS:amaterasu}
     hikari:
       maximum-pool-size: 5
       minimum-idle: 2
@@ -57,20 +57,19 @@ spring:
         format_sql: true
         use_sql_comments: false
 
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      timeout: 6000ms
-      database: 0
-      connect-timeout: 10000ms
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 2
-          max-wait: 2000ms
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    timeout: 6000ms
+    database: 0
+    connect-timeout: 10000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 2000ms
 
   cache:
     type: redis
@@ -110,10 +109,12 @@ logging:
 # Development-specific Inferno settings
 inferno:
   uptime:
-    concurrent-checks: 10
-    default-check-interval: 60s
+    concurrent-checks: 50
+    thread-pool-size: 20
     cleanup:
       enabled: false
+      retention-days: 90
+      schedule: "0 0 2 * * ?"
 
 security:
   default-admin-password: dev-password

@@ -125,7 +125,7 @@ export class MonitorService {
   private monitorsSubject = new BehaviorSubject<Monitor[]>([]);
   
   constructor(private http: HttpClient, private environmentService: EnvironmentService) {
-    this.baseUrl = `${this.environmentService.settings?.restUrl}/api/v1/monitors`
+    this.baseUrl = `${this.environmentService.settings?.restUrl}/v1/monitors`
     this.loadMonitors();
   }
 

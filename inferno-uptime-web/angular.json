@@ -26,6 +26,9 @@
                         ],
                         "tsConfig": "tsconfig.app.json",
                         "inlineStyleLanguage": "scss",
+                        "define": {
+                            "global": "globalThis"
+                        },
                         "assets": [
                             "src/favicon.ico",
                             "src/assets",

@@ -78,6 +78,46 @@ public class MonitorCheckService {
         return CompletableFuture.completedFuture(check);
     }
 
+    /**
+     * Trigger an immediate check for a specific monitor
+     */
+    public CompletableFuture<MonitorCheck> triggerImmediateCheck(Long monitorId) {
+        log.info("Triggering immediate check for monitor ID: {}", monitorId);
+
+        Monitor monitor = monitorRepository.findById(monitorId)
+                .orElseThrow(() -> new RuntimeException("Monitor not found with ID: " + monitorId));
+
+        if (!monitor.getIsActive()) {
+            throw new RuntimeException("Cannot check inactive monitor: " + monitorId);
+        }
+
+        return performCheck(monitor);
+    }
+
+    /**
+     * Trigger immediate checks for multiple monitors
+     */
+    public List<CompletableFuture<MonitorCheck>> triggerBulkChecks(List<Long> monitorIds) {
+        log.info("Triggering bulk checks for {} monitors", monitorIds.size());
+
+        return monitorIds.stream()
+                .map(this::triggerImmediateCheck)
+                .toList();
+    }
+
+    /**
+     * Trigger checks for all active monitors
+     */
+    public List<CompletableFuture<MonitorCheck>> triggerAllActiveChecks() {
+        log.info("Triggering checks for all active monitors");
+
+        List<Monitor> activeMonitors = monitorRepository.findByIsActiveTrue();
+
+        return activeMonitors.stream()
+                .map(this::performCheck)
+                .toList();
+    }
+
     private void performHttpCheck(Monitor monitor, MonitorCheck check, long startTime) {
         WebClient webClient = webClientBuilder
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024)) // 1MB limit
@@ -249,5 +289,50 @@ public class MonitorCheckService {
 
         MonitorCheck previousCheck = recentChecks.get(1);
         return !check.getIsUp().equals(previousCheck.getIsUp());
+    }
+
+    // ======================== Statistics Methods ========================
+
+    public Double calculateUptimePercentage(Monitor monitor, LocalDateTime since) {
+        return monitorCheckRepository.calculateUptimePercentage(monitor, since);
+    }
+
+    public Double calculateOverallUptimePercentage(LocalDateTime since) {
+        return monitorCheckRepository.calculateOverallUptimePercentage(since);
+    }
+
+    public Long getTotalChecksToday() {
+        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+        return monitorCheckRepository.countChecksAfter(startOfDay);
+    }
+
+    public Long getTotalChecksThisWeek() {
+        LocalDateTime startOfWeek = LocalDateTime.now().minusDays(7);
+        return monitorCheckRepository.countChecksThisWeek(startOfWeek);
+    }
+
+    public Long getTotalChecksThisMonth() {
+        LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        return monitorCheckRepository.countChecksThisMonth(startOfMonth);
+    }
+
+    // ======================== Cleanup Methods ========================
+
+    @Transactional
+    public void cleanupOldChecks(LocalDateTime cutoffDate) {
+        log.info("Cleaning up check data older than: {}", cutoffDate);
+
+        Long oldCheckCount = monitorCheckRepository.countOldChecks(cutoffDate);
+        log.info("Found {} old checks to delete", oldCheckCount);
+
+        monitorCheckRepository.deleteOldChecks(cutoffDate);
+
+        log.info("Cleanup completed. Deleted {} old check records", oldCheckCount);
+    }
+
+    @Transactional
+    public void deleteAllChecksForMonitor(Monitor monitor) {
+        log.info("Deleting all checks for monitor: {}", monitor.getName());
+        monitorCheckRepository.deleteAllChecksByMonitor(monitor);
     }
 }

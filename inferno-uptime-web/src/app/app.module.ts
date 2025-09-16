@@ -3,7 +3,6 @@ import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
 import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MaterialModule } from './material.module';
 import { EnvironmentService } from './services/environment.service';
@@ -13,6 +12,7 @@ import { AgGridAngular } from 'ag-grid-angular';
 import { AuthInterceptor } from './services/auth/auth-interceptor.service';
 import { ThemeService } from './services/theme.service';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
+import { AppComponent } from './app.component';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -36,6 +36,7 @@ export function init_app(environmentService: EnvironmentService) {
 
 @NgModule({
   declarations: [
+    AppComponent
   ],
   imports: [
     BrowserModule,

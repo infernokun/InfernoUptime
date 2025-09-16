@@ -2,6 +2,8 @@ package com.infernokun.infernoUptime.controllers;
 
 import com.infernokun.infernoUptime.models.dto.*;
 import com.infernokun.infernoUptime.models.entity.Monitor;
+import com.infernokun.infernoUptime.models.entity.MonitorCheck;
+import com.infernokun.infernoUptime.services.DashboardService;
 import com.infernokun.infernoUptime.services.MonitorCheckService;
 import com.infernokun.infernoUptime.services.MonitorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +33,7 @@ public class MonitorController {
 
     private final MonitorService monitorService;
     private final MonitorCheckService monitorCheckService;
+    private final DashboardService dashboardService;
 
     @Operation(summary = "Create a new monitor", description = "Creates a new uptime monitor")
     @ApiResponses(value = {
@@ -176,21 +179,9 @@ public class MonitorController {
     @Operation(summary = "Get dashboard summary", description = "Retrieves summary statistics for the dashboard")
     @GetMapping("/dashboard/summary")
     public ResponseEntity<com.infernokun.infernoUptime.models.dto.ApiResponse<DashboardSummary>> getDashboardSummary() {
-        DashboardSummary summary = monitorService.getDashboardSummary();
+        DashboardSummary summary = dashboardService.getDashboardSummary();
 
         return ResponseEntity.ok(
                 com.infernokun.infernoUptime.models.dto.ApiResponse.success("Dashboard summary retrieved successfully", summary));
-    }
-
-    @Operation(summary = "Test monitor configuration", description = "Tests a monitor configuration without saving")
-    @PostMapping("/test")
-    public ResponseEntity<com.infernokun.infernoUptime.models.dto.ApiResponse<MonitorTestResult>> testMonitor(
-            @Valid @RequestBody MonitorTestRequest request) {
-
-        log.info("Testing monitor configuration: {}", request.getUrl());
-        MonitorTestResult result = monitorService.testMonitorConfiguration(request);
-
-        return ResponseEntity.ok(
-                com.infernokun.infernoUptime.models.dto.ApiResponse.success("Monitor test completed", result));
     }
 }

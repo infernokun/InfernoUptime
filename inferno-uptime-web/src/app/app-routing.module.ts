@@ -10,19 +10,19 @@ export const routes: Routes = [
   { path: 'monitors', component: MonitorsComponent },
   { 
     path: 'monitors/:id', 
-    loadComponent: () => import('./components/monitor-details.component').then(m => m.MonitorDetailsComponent)
+    loadComponent: () => import('./components/monitor-details/monitor-details.component').then(m => m.MonitorDetailsComponent)
   },
   { 
     path: 'incidents', 
-    loadComponent: () => import('./components/incidents.component').then(m => m.IncidentsComponent)
+    loadComponent: () => import('./components/incidents/incidents.component').then(m => m.IncidentsComponent)
   },
   { 
     path: 'reports', 
-    loadComponent: () => import('./components/reports.component').then(m => m.ReportsComponent)
+    loadComponent: () => import('./components/reports/reports.component').then(m => m.ReportsComponent)
   },
   { 
     path: 'settings', 
-    loadComponent: () => import('./components/settings.component').then(m => m.SettingsComponent)
+    loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent)
   },
   { path: '**', redirectTo: '/dashboard' }
 ];

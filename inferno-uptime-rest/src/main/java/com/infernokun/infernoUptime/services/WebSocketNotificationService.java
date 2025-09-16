@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 public class WebSocketNotificationService {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final MonitorMapper monitorMapper;
 
     public void sendMonitorUpdate(Monitor monitor, MonitorCheck check) {
         try {

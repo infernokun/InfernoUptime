@@ -1,10 +1,13 @@
 package com.infernokun.infernoUptime.services;
 
+import com.infernokun.infernoUptime.models.dto.DashboardSummary;
+import com.infernokun.infernoUptime.models.dto.MonitorResponse;
 import com.infernokun.infernoUptime.models.entity.Monitor;
 import com.infernokun.infernoUptime.repositories.MonitorCheckRepository;
 import com.infernokun.infernoUptime.repositories.MonitorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -17,7 +20,7 @@ public class DashboardService {
 
     private final MonitorRepository monitorRepository;
     private final MonitorCheckRepository monitorCheckRepository;
-    private final MonitorMapper monitorMapper;
+    private final MonitorMapperService monitorMapper; // Changed from MonitorMapper
     private final CacheService cacheService;
 
     public DashboardSummary getDashboardSummary() {
@@ -38,32 +41,36 @@ public class DashboardService {
         // Calculate overall uptime for last 24 hours
         LocalDateTime dayAgo = LocalDateTime.now().minusDays(1);
         Double overallUptime = calculateOverallUptime(dayAgo);
-
-        // Calculate average response time for last 24 hours
         Double averageResponseTime = calculateAverageResponseTime(dayAgo);
 
-        // Get total checks today
+        // Get total checks for different periods
         LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         Long totalChecksToday = monitorCheckRepository.countChecksAfter(startOfDay);
 
-        // Get recently down monitors
-        List<MonitorResponse> recentlyDown = getRecentlyDownMonitors();
+        LocalDateTime startOfWeek = LocalDateTime.now().minusDays(7);
+        Long totalChecksThisWeek = monitorCheckRepository.countChecksThisWeek(startOfWeek);
 
-        // Get slowest monitors
-        List<MonitorResponse> slowestMonitors = getSlowestMonitors();
+        LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        Long totalChecksThisMonth = monitorCheckRepository.countChecksThisMonth(startOfMonth);
 
-        DashboardSummary summary = DashboardSummary.builder()
-                .totalMonitors(totalMonitors)
-                .activeMonitors(activeMonitors)
-                .monitorsUp(monitorsUp)
-                .monitorsDown(monitorsDown)
-                .monitorsPending(monitorsPending)
-                .overallUptime(overallUptime)
-                .averageResponseTime(averageResponseTime)
-                .totalChecksToday(totalChecksToday)
-                .recentlyDown(recentlyDown)
-                .slowestMonitors(slowestMonitors)
-                .build();
+        // Get recently down monitors (limit to 5)
+        List<Monitor> recentlyDownMonitors = monitorRepository.findRecentlyDownMonitors(
+                Pageable.ofSize(5)
+        );
+        List<MonitorResponse> recentlyDown = monitorMapper.toResponseList(recentlyDownMonitors);
+
+        // Get slowest and fastest monitors
+        List<Monitor> slowestMonitorsList = monitorRepository.findSlowestMonitors(5);
+        List<MonitorResponse> slowestMonitors = monitorMapper.toResponseList(slowestMonitorsList);
+
+        List<Monitor> fastestMonitorsList = monitorRepository.findFastestMonitors(5);
+        List<MonitorResponse> fastestMonitors = monitorMapper.toResponseList(fastestMonitorsList);
+
+        DashboardSummary summary = monitorMapper.createDashboardSummary(
+                totalMonitors, activeMonitors, monitorsUp, monitorsDown, monitorsPending,
+                overallUptime, averageResponseTime, totalChecksToday, totalChecksThisWeek, totalChecksThisMonth,
+                recentlyDown, slowestMonitors, fastestMonitors
+        );
 
         // Cache the result
         cacheService.cacheDashboardSummary(summary);
@@ -88,7 +95,7 @@ public class DashboardService {
             successfulChecks += monitorSuccessful;
         }
 
-        return totalChecks > 0 ? (successfulChecks.doubleValue() / totalChecks.doubleValue()) * 100 : 100.0;
+        return totalChecks > 0 ? (successfulChecks / totalChecks) * 100 : 100.0;
     }
 
     private Double calculateAverageResponseTime(LocalDateTime since) {
@@ -111,7 +118,8 @@ public class DashboardService {
         return monitorCount > 0 ? totalResponseTime / monitorCount : 0.0;
     }
 
-    private List<MonitorResponse> getRecentlyDownMonitors() {
+    // Additional helper methods for dashboard components
+    public List<MonitorResponse> getRecentlyDownMonitors() {
         List<Monitor> downMonitors = monitorRepository.findByCurrentStatusAndIsActiveTrue(
                 Monitor.MonitorStatus.DOWN);
 
@@ -121,12 +129,42 @@ public class DashboardService {
                 .toList();
     }
 
-    private List<MonitorResponse> getSlowestMonitors() {
-        // This would need a custom query to get monitors with highest average response times
+    public List<MonitorResponse> getSlowestMonitors() {
         List<Monitor> slowMonitors = monitorRepository.findSlowestMonitors(5);
+        return monitorMapper.toResponseList(slowMonitors);
+    }
 
-        return slowMonitors.stream()
-                .map(monitorMapper::toResponse)
-                .toList();
+    public List<MonitorResponse> getFastestMonitors() {
+        List<Monitor> fastMonitors = monitorRepository.findFastestMonitors(5);
+        return monitorMapper.toResponseList(fastMonitors);
+    }
+
+    // Performance metrics
+    public Double getOverallUptimeForPeriod(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        return calculateOverallUptime(since);
+    }
+
+    public Double getAverageResponseTimeForPeriod(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        return calculateAverageResponseTime(since);
+    }
+
+    // Count methods for dashboard widgets
+    public Long getTotalChecksForPeriod(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        return monitorCheckRepository.countChecksAfter(since);
+    }
+
+    public Long getFailedChecksForPeriod(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        return monitorCheckRepository.countFailedChecks(since);
+    }
+
+    // Real-time status counts
+    public void refreshDashboardCache() {
+        log.info("Refreshing dashboard cache");
+        cacheService.evictAllCaches();
+        getDashboardSummary(); // This will rebuild the cache
     }
 }
